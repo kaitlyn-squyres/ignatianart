@@ -22,28 +22,31 @@
                 font-size: 16pt;
                 font-weight: 600;
                 text-align: center;
-                margin-top: 40px;
+                margin-top: 20px;
                 margin-bottom: 10px;
             }
             .home-subtitle {
                 font-family: "Urbanist", sans-serif;
                 font-size: 12pt;
                 text-align: center;
-                margin-bottom: 30px;
+                margin-bottom: 20px;
                 color: #555;
             }
-      .epub-banner {
-        width: 100vw;
-        height: 600px;
-        background-color: #d3d3d3;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        margin: 0;
-        box-sizing: border-box;
-        overflow: hidden;
-      }
+    .epub-banner {
+    width: 100vw;
+    min-height: 600px;   /* keep minimum 600px */
+    max-height: 900px;  /* cap at 900px */
+    height: auto;        /* allow growth within min/max */
+    margin-top: 36px;   /* push banner down to clear title/subtitle */
+      background-color: #d3d3d3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-sizing: border-box;
+      overflow: visible;   /* important */
+    }
+
       #epub-viewer-container {
         width: 100%;
         height: 100%;
@@ -54,36 +57,38 @@
         padding: 0;
         margin: 0;
       }
-      /* Frame sized to 11in x 8.5in, scales down responsively */
-      #epub-frame {
-        width: 11in;
-        aspect-ratio: 11 / 8.5;
-        max-width: calc(100% - 20px);
-        max-height: calc(100% - 20px);
-        background-color: white;
-        border: 5px solid #000;
-        box-sizing: border-box;
-        overflow: hidden;
-        position: relative;
-        display: flex;
-        flex-direction: column;
-      }
+      /* Frame sized to 11in x 8.5in, scales down responsively; border tightly wraps content */
+    #epub-frame {
+      width: 100%;
+      max-width: 900px;
+      width: calc(100% - 40px);
+      height: auto;
+      border: 3px solid #000;
+      box-sizing: border-box;
+        aspect-ratio: 11 / 8.5; /* Use frame height to determine width so fixed pages scale correctly (11in x 8.5in) */
+    }
       #epub-viewer {
+        flex: 1 1 auto;
         width: 100%;
         height: 100%;
+        display: block;
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
       }
             #epub-viewer {
                 width: 100%;
                 height: 100%;
             }
             .epub-nav-controls {
-                position: absolute;
-                bottom: 10px;
-                left: 50%;
-                transform: translateX(-50%);
                 display: flex;
                 gap: 10px;
-                z-index: 10;
+                justify-content: center;
+                align-items: center;
+            }
+            .epub-nav-controls.below {
+                margin: 12px auto 0 auto;
+                padding-bottom: 8px;
             }
             .epub-nav-btn {
                 padding: 6px 12px;
@@ -91,15 +96,18 @@
                 background-color: rgba(255, 255, 255, 0.9);
                 border: 1px solid #333;
                 border-radius: 4px;
-                cursor: pointer;
-                font-family: "Urbanist", sans-serif;
-            }
-            .epub-nav-btn:hover:not(:disabled) {
-                background-color: #f0f0f0;
-            }
-            .epub-nav-btn:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
+              .epub-nav-controls {
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+                align-items: center;
+              }
+              .epub-nav-controls.below {
+                display: flex;
+                justify-content: center;
+                margin: 12px auto 20px auto;
+                padding-bottom: 8px;
+              }
             }
             .epub-info {
                 position: absolute;
@@ -146,10 +154,12 @@
         <div id="epub-viewer-container">
           <div id="epub-frame">
             <div id="epub-viewer"></div>
-            <div class="epub-nav-controls">
-              <button id="prev-btn" class="epub-nav-btn" disabled>← Previous</button>
-              <button id="next-btn" class="epub-nav-btn" disabled>Next →</button>
-            </div>
+          </div>
+          </div>
+          </div>
+          <div class="epub-nav-controls below">
+            <button id="prev-btn" class="epub-nav-btn" disabled>← Previous</button>
+            <button id="next-btn" class="epub-nav-btn" disabled>Next →</button>
           </div>
         </div>
       </div>
@@ -160,7 +170,7 @@
 
                 // Load EPUB on page load
                 window.addEventListener('load', function() {
-                  loadEpubFromUrl('../Images&Docs/Invitation_to_Ignatian_Art_2.2.epub', 'Invitation to Ignatian Art');
+                  loadEpubFromUrl('../Images&Docs/Invitation_to_Ignatian_Art_2.3.epub', 'Invitation to Ignatian Art');
                 });
 
                 // File input removed; EPUB auto-loads from Images&Docs on page load
@@ -190,19 +200,48 @@
                   
                   // Create new book from buffer
                   book = ePub(arrayBuffer);
+                  // For fixed-layout EPUBs, render with paginated flow and allow spreads when appropriate
                   rendition = book.renderTo('epub-viewer', {
                     width: '100%',
                     height: '100%',
-                    spread: 'reflowable'
+                    spread: 'both',
+                    flow: 'paginated'
                   });
 
-                  // Book is ready (no visible title in container)
+                  // Remove default margins/padding inside the EPUB iframe so content fills the frame
+                  try {
+                    const css = 'html, body { margin: 0 !important; padding: 0 !important; }';
+                    const dataUrl = 'data:text/css;charset=utf-8,' + encodeURIComponent(css);
+                    rendition.themes.register('noMargins', dataUrl);
+                    rendition.themes.select('noMargins');
+                  } catch (e) {
+                    console.warn('Could not apply noMargins theme:', e);
+                  }
+
+                  // Book is ready
                   book.ready.then(() => {
                     console.log('EPUB ready:', displayName);
-                  });
 
-                  // Display first page
-                  const displayed = rendition.display();
+                    // Compute the display size from the frame so fixed-layout pages match exactly
+                    const frame = document.getElementById('epub-frame');
+                    const rect = frame.getBoundingClientRect();
+                    const pxWidth = Math.max(1, Math.floor(rect.width));
+                    const pxHeight = Math.max(1, Math.floor(rect.height));
+
+                    // For fixed-layout EPUBs, force a pixel-sized display so pages fill the frame
+                    try {
+                      rendition.resize(pxWidth, pxHeight);
+                    } catch (e) { /* ignore */ }
+
+                    // Use spread:none to avoid two-page spreads for fixed layout
+                    try {
+                      rendition.themes.register('noMargins', 'html, body { margin: 0 !important; padding: 0 !important; }');
+                      rendition.themes.select('noMargins');
+                    } catch (e) {}
+
+                    // Display first page at exact pixel size
+                    rendition.display({ width: pxWidth, height: pxHeight, force: true, reload: true });
+                  });
 
                   // Enable navigation
                   document.getElementById('next-btn').disabled = false;
@@ -226,6 +265,22 @@
                     }
                   };
                   document.addEventListener('keydown', handleKeydown);
+
+                  // Ensure rendition resizes and redisplays when window changes so fixed pages fill frame
+                  let resizeTimeout = null;
+                  const handleResize = () => {
+                    if (!rendition) return;
+                    clearTimeout(resizeTimeout);
+                    resizeTimeout = setTimeout(() => {
+                      const frame = document.getElementById('epub-frame');
+                      const rect = frame.getBoundingClientRect();
+                      const pxWidth = Math.max(1, Math.floor(rect.width));
+                      const pxHeight = Math.max(1, Math.floor(rect.height));
+                      try { rendition.resize(pxWidth, pxHeight); } catch (e) { console.warn('rendition.resize() failed', e); }
+                      try { rendition.display({ width: pxWidth, height: pxHeight, force: true, reload: true }); } catch (e) { console.warn('rendition.display() failed', e); }
+                    }, 120);
+                  };
+                  window.addEventListener('resize', handleResize);
                 }
             </script>
         </body>
